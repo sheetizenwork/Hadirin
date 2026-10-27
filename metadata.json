@@ -1,0 +1,6 @@
+{
+  "name": "Hadirin - Sistem Presensi Tamu & QR Check-in",
+  "description": "Aplikasi presensi tamu acara berbasis QR Code modern, responsif mobile & desktop, manajemen tamu cepat, pemantauan kehadiran real-time, dan ekspor laporan.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
