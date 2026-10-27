@@ -133,6 +133,8 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Window Focus & Cross-Device Heartbeat (Laptop & HP sync seamlessly without reload)
   useEffect(() => {
+    if (!user) return;
+
     const handleFocus = () => {
       refreshFromSupabase();
     };
@@ -147,7 +149,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
     };
-  }, [refreshFromSupabase]);
+  }, [refreshFromSupabase, user]);
 
   // Initialize Supabase Auth & load data immediately on mount
   useEffect(() => {
@@ -164,11 +166,12 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
             avatar: (session.user.user_metadata?.name || session.user.email || 'PA').slice(0, 2).toUpperCase(),
           };
           setUser(u);
+          await refreshFromSupabase(false);
         } else {
           setUser(null);
         }
 
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session?.user) {
             const u: UserProfile = {
               id: session.user.id,
@@ -177,9 +180,11 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
               avatar: (session.user.user_metadata?.name || session.user.email || 'PA').slice(0, 2).toUpperCase(),
             };
             setUser(u);
+            await refreshFromSupabase(false);
           } else {
             setUser(null);
           }
+          setIsLoading(false);
         });
 
         subscription = authListener.subscription;
@@ -187,7 +192,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         console.error('Auth getSession err:', err);
         setUser(null);
       } finally {
-        refreshFromSupabase();
+        setIsLoading(false);
       }
     };
 
@@ -200,6 +205,8 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Real-time Supabase Subscription for Guests table
   useEffect(() => {
+    if (!user) return;
+
     const channel = supabase
       .channel('public:guests_realtime')
       .on(
@@ -221,7 +228,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   // Auth Operations
   const login = async (email: string, password = ''): Promise<{ success: boolean; error?: string }> => {
@@ -292,12 +299,18 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    setIsLoading(false);
+    setUser(null);
+    setGuests([]);
+    setActiveTab('dashboard');
     try {
       await supabase.auth.signOut();
     } catch (e) {
       console.warn('Sign out error:', e);
+    } finally {
+      setUser(null);
+      setIsLoading(false);
     }
-    setUser(null);
   };
 
   // Event Details update in Supabase
