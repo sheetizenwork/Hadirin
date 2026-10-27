@@ -8,6 +8,8 @@ export interface ParsedGuestItem {
   organization: string;
   pax: number;
   hasDegree?: boolean;
+  isDuplicate?: boolean;
+  duplicateReason?: 'already_in_db' | 'duplicate_in_input';
 }
 
 // Regex for common Indonesian and international academic titles & professional degrees
@@ -58,16 +60,20 @@ export function isAcademicDegree(token: string): boolean {
 export type ParseMode = 'smart' | 'name_only' | 'tab' | 'semicolon' | 'dash' | 'pipe';
 
 /**
- * Parse bulk text input into guest items with special handling for academic titles
+ * Parse bulk text input into guest items with special handling for academic titles and duplicate detection
  */
 export function parseBulkGuestInput(
   rawText: string,
-  mode: ParseMode = 'smart'
+  mode: ParseMode = 'smart',
+  existingNames: string[] = []
 ): ParsedGuestItem[] {
   if (!rawText || !rawText.trim()) return [];
 
+  const existingSet = new Set(existingNames.map((n) => n.trim().toLowerCase()));
+  const seenInInput = new Set<string>();
+
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
-  const results: ParsedGuestItem[] = [];
+  const rawResults: ParsedGuestItem[] = [];
 
   for (const line of lines) {
     // Skip common table headers if copied with header
@@ -79,88 +85,66 @@ export function parseBulkGuestInput(
       continue;
     }
 
-    // MODE: Name Only (1 baris = 1 tamu utuh, koma gelar dijamin aman 100%)
+    // Parse item based on chosen mode
+    let item: ParsedGuestItem | null = null;
     if (mode === 'name_only') {
       const cleanName = line.replace(/^["']|["']$/g, '').trim();
       if (cleanName) {
-        results.push({
+        item = {
           name: cleanName,
           organization: '',
           pax: 1,
           hasDegree: cleanName.includes(',') && cleanName.split(',').slice(1).some(isAcademicDegree),
-        });
+        };
       }
-      continue;
-    }
-
-    // Explicit separator modes
-    if (mode === 'tab') {
-      results.push(parseSeparatedLine(line.split('\t')));
-      continue;
-    }
-    if (mode === 'semicolon') {
-      results.push(parseSeparatedLine(line.split(';')));
-      continue;
-    }
-    if (mode === 'dash') {
-      results.push(parseSeparatedLine(line.split(' - ')));
-      continue;
-    }
-    if (mode === 'pipe') {
-      results.push(parseSeparatedLine(line.split('|')));
-      continue;
-    }
-
-    // MODE: 'smart' (AI / Regex Intelligent Auto-detection)
-    // 1. If tab is present (user copied from Excel or Google Sheets)
-    if (line.includes('\t')) {
-      results.push(parseSeparatedLine(line.split('\t')));
-      continue;
-    }
-
-    // 2. If pipe is present (e.g. Tukiman, S.Pd. | SMPN 1 | 2)
-    if (line.includes('|')) {
-      results.push(parseSeparatedLine(line.split('|')));
-      continue;
-    }
-
-    // 3. If semicolon is present (e.g. Tukiman, S.Pd., M.T. ; SMPN 1 ; 2)
-    if (line.includes(';')) {
-      results.push(parseSeparatedLine(line.split(';')));
-      continue;
-    }
-
-    // 4. If dash with spaces is present (e.g. Tukiman, S.Pd., M.T. - SMPN 1)
-    if (line.includes(' - ')) {
-      results.push(parseSeparatedLine(line.split(' - ')));
-      continue;
-    }
-
-    // 5. Handling comma and academic degrees:
-    // When a line contains commas, we must differentiate between:
-    // Case A: Comma inside an academic title: "Tukiman, S.Pd., M.T."
-    // Case B: Comma separating name with degrees and organization: "Tukiman, S.Pd., M.T., SMPN 1 Bandung, 2"
-    // Case C: Standard CSV with quotes: '"Tukiman, S.Pd., M.T.", "SMPN 1 Bandung", 2'
-    if (line.includes(',')) {
-      const parsedFromComma = parseSmartCommaLine(line);
-      if (parsedFromComma) {
-        results.push(parsedFromComma);
-        continue;
+    } else if (mode === 'tab') {
+      item = parseSeparatedLine(line.split('\t'));
+    } else if (mode === 'semicolon') {
+      item = parseSeparatedLine(line.split(';'));
+    } else if (mode === 'dash') {
+      item = parseSeparatedLine(line.split(' - '));
+    } else if (mode === 'pipe') {
+      item = parseSeparatedLine(line.split('|'));
+    } else {
+      // mode === 'smart'
+      if (line.includes('\t')) {
+        item = parseSeparatedLine(line.split('\t'));
+      } else if (line.includes('|')) {
+        item = parseSeparatedLine(line.split('|'));
+      } else if (line.includes(';')) {
+        item = parseSeparatedLine(line.split(';'));
+      } else if (line.includes(' - ')) {
+        item = parseSeparatedLine(line.split(' - '));
+      } else if (line.includes(',')) {
+        item = parseSmartCommaLine(line);
+      } else {
+        const clean = line.replace(/^["']|["']$/g, '').trim();
+        if (clean) {
+          item = {
+            name: clean,
+            organization: '',
+            pax: 1,
+          };
+        }
       }
     }
 
-    // 6. Fallback: single name without delimiters
-    const clean = line.replace(/^["']|["']$/g, '').trim();
-    if (clean) {
-      results.push({
-        name: clean,
-        organization: '',
-        pax: 1,
-      });
+    if (item && item.name && item.name.trim().length > 0) {
+      const lower = item.name.trim().toLowerCase();
+      if (existingSet.has(lower)) {
+        item.isDuplicate = true;
+        item.duplicateReason = 'already_in_db';
+      } else if (seenInInput.has(lower)) {
+        item.isDuplicate = true;
+        item.duplicateReason = 'duplicate_in_input';
+      } else {
+        seenInInput.add(lower);
+      }
+      rawResults.push(item);
     }
   }
 
-  return results.filter((item) => item.name && item.name.trim().length > 0);
+  return rawResults;
 }
 
 /**

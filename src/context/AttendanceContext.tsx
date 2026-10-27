@@ -322,6 +322,16 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     organization?: string;
     pax?: number;
   }): Promise<Guest | null> => {
+    const trimmedName = guestData.name.trim();
+    if (!trimmedName) return null;
+
+    // PREVENT DUPLICATES: Check if name already exists in guests (case-insensitive & trimmed)
+    const existing = guests.find((g) => g.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      console.warn(`Tamu dengan nama "${trimmedName}" sudah terdaftar dalam daftar.`);
+      return null;
+    }
+
     const finalPax = guestData.pax && guestData.pax > 0 ? Number(guestData.pax) : 1;
     const tempId = `g-${Date.now()}`;
 
@@ -329,7 +339,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     const newGuest: Guest = {
       id: tempId,
       qr_code: tempId,
-      name: guestData.name.trim(),
+      name: trimmedName,
       organization: guestData.organization?.trim() || '',
       pax: finalPax,
       status: 'pending',
@@ -420,7 +430,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  // Bulk add guests directly to Supabase
+  // Bulk add guests directly to Supabase with duplicate filtering
   const bulkAddGuests = async (
     newGuests: Array<{
       name: string;
@@ -431,15 +441,35 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     if (!newGuests.length) return 0;
     const now = Date.now();
 
-    const validItems = newGuests.filter((item) => item.name && item.name.trim().length > 0);
+    // Deduplicate against existing guests in database AND within the batch
+    const existingSet = new Set(guests.map((g) => g.name.trim().toLowerCase()));
+    const seenBatch = new Set<string>();
+
+    const validItems: Array<{ name: string; organization: string; pax: number }> = [];
+    for (const item of newGuests) {
+      const trimmed = item.name ? item.name.trim() : '';
+      if (!trimmed) continue;
+      const lower = trimmed.toLowerCase();
+      if (!existingSet.has(lower) && !seenBatch.has(lower)) {
+        seenBatch.add(lower);
+        validItems.push({
+          name: trimmed,
+          organization: item.organization?.trim() || '',
+          pax: item.pax && item.pax > 0 ? Number(item.pax) : 1,
+        });
+      }
+    }
+
+    if (validItems.length === 0) return 0;
+
     const localList: Guest[] = validItems.map((item, index) => {
       const id = `g-${now}-${index}`;
       return {
         id,
         qr_code: id,
-        name: item.name.trim(),
-        organization: item.organization?.trim() || '',
-        pax: item.pax && item.pax > 0 ? Number(item.pax) : 1,
+        name: item.name,
+        organization: item.organization,
+        pax: item.pax,
         status: 'pending',
         checked_in_at: null,
         actual_pax: 0,

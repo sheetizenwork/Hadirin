@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, UserPlus } from 'lucide-react';
+import { X, UserPlus, AlertCircle } from 'lucide-react';
 import { useAttendance } from '../context/AttendanceContext';
 
 interface AddGuestModalProps {
@@ -8,7 +8,7 @@ interface AddGuestModalProps {
 }
 
 export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose }) => {
-  const { addGuest } = useAttendance();
+  const { addGuest, guests } = useAttendance();
 
   const [name, setName] = useState('');
   const [organization, setOrganization] = useState('');
@@ -16,15 +16,21 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
 
   if (!isOpen) return null;
 
+  const trimmedName = name.trim();
+  const duplicateGuest = trimmedName.length > 0
+    ? guests.find((g) => g.name.trim().toLowerCase() === trimmedName.toLowerCase())
+    : null;
+  const isDuplicate = !!duplicateGuest;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!trimmedName || isDuplicate) return;
 
     const parsedPax = parseInt(paxInput, 10);
     const finalPax = isNaN(parsedPax) || parsedPax < 1 ? 1 : parsedPax;
 
     addGuest({
-      name: name.trim(),
+      name: trimmedName,
       organization: organization.trim(),
       pax: finalPax,
     });
@@ -81,9 +87,27 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Contoh: Tukiman, S.Pd., M.T."
-              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className={`w-full px-3.5 py-2.5 text-sm bg-slate-50 border rounded-xl focus:ring-2 focus:outline-none transition-all ${
+                isDuplicate 
+                  ? 'border-amber-400 focus:ring-amber-400 bg-amber-50/30' 
+                  : 'border-slate-300 focus:ring-indigo-500'
+              }`}
             />
           </div>
+
+          {/* DUPLICATE WARNING BANNER */}
+          {isDuplicate && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Nama Tamu Sudah Terdaftar!</p>
+                <p className="text-[11px] text-amber-700 mt-0.5">
+                  Tamu <strong>"{duplicateGuest?.name}"</strong> sudah ada di database ({duplicateGuest?.organization || 'tanpa instansi'}).
+                  Harap ubah nama atau tambahkan pembeda agar data tidak terduplikasi.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -124,7 +148,8 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all"
+              disabled={isDuplicate || !trimmedName}
+              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all"
             >
               Tambahkan Tamu
             </button>

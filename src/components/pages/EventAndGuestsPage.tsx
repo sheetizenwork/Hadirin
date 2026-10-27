@@ -25,6 +25,7 @@ import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
 import { generateQRCodeDataURL } from '../../lib/qrUtils';
 import { CheckInSuccessModal } from '../CheckInSuccessModal';
+import { DownloadGuestsModal } from '../DownloadGuestsModal';
 import { parseBulkGuestInput, ParseMode, ParsedGuestItem } from '../../lib/bulkGuestParser';
 
 interface EventAndGuestsPageProps {
@@ -72,20 +73,36 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
   // Check In confirmation modal state
   const [checkInModalGuest, setCheckInModalGuest] = useState<Guest | null>(null);
 
+  // Download tickets modal state
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
   // Bulk paste state & mode
   const [bulkInputText, setBulkInputText] = useState('');
   const [bulkParseMode, setBulkParseMode] = useState<ParseMode>('smart');
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [bulkFeedback, setBulkFeedback] = useState<string | null>(null);
   const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
 
-  // Live parsed preview of guests
-  const previewGuests = useMemo(() => {
-    return parseBulkGuestInput(bulkInputText, bulkParseMode);
-  }, [bulkInputText, bulkParseMode]);
+  // Existing names in database for duplicate detection
+  const existingNames = useMemo(() => guests.map((g) => g.name), [guests]);
 
-  // Count how many guests in preview have detected degrees
+  // Live parsed preview of guests with duplicate detection
+  const previewGuests = useMemo(() => {
+    return parseBulkGuestInput(bulkInputText, bulkParseMode, existingNames);
+  }, [bulkInputText, bulkParseMode, existingNames]);
+
+  // Filtered preview based on skipDuplicates setting
+  const validPreviewGuests = useMemo(() => {
+    return skipDuplicates ? previewGuests.filter((g) => !g.isDuplicate) : previewGuests;
+  }, [previewGuests, skipDuplicates]);
+
+  // Count how many guests in preview have detected degrees & duplicates
   const degreeCount = useMemo(() => {
     return previewGuests.filter((g) => g.hasDegree).length;
+  }, [previewGuests]);
+
+  const duplicateCount = useMemo(() => {
+    return previewGuests.filter((g) => g.isDuplicate).length;
   }, [previewGuests]);
 
   // Edit form state with string pax so backspace works easily
@@ -141,20 +158,22 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     }
   };
 
-  // Bulk Import Executor using parsed preview
+  // Bulk Import Executor using parsed preview and duplicate prevention
   const handleProcessBulk = async () => {
-    if (previewGuests.length === 0) return;
+    const itemsToInsert = validPreviewGuests;
+    if (itemsToInsert.length === 0) return;
 
     setIsSubmittingBulk(true);
     try {
-      const addedCount = await bulkAddGuests(previewGuests);
-      setBulkFeedback(`Berhasil menambahkan ${addedCount} nama tamu sekaligus ke database!`);
+      const addedCount = await bulkAddGuests(itemsToInsert);
+      const skippedMsg = duplicateCount > 0 && skipDuplicates ? ` (${duplicateCount} nama duplikat dilewati).` : '';
+      setBulkFeedback(`Berhasil menambahkan ${addedCount} tamu sekaligus ke database!${skippedMsg}`);
       setTimeout(() => {
         setIsBulkModalOpen(false);
         setBulkInputText('');
         setBulkFeedback(null);
         setIsSubmittingBulk(false);
-      }, 1400);
+      }, 1500);
     } catch (err) {
       console.error('Error adding bulk guests:', err);
       setIsSubmittingBulk(false);
@@ -358,7 +377,15 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="px-3.5 py-2.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Download daftar tamu dan QR code (Row 1: Nama & Gelar, Row 2: QR Code)"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              <span>Download Undangan & QR</span>
+            </button>
             <button
               onClick={() => setIsBulkModalOpen(true)}
               className="px-3.5 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 shadow-sm"
@@ -805,21 +832,48 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
 
               {/* LIVE PREVIEW BOX */}
               {previewGuests.length > 0 && (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                       <span className="text-xs font-bold text-slate-900">
-                        Pratinjau Hasil Impor ({previewGuests.length} Tamu Siap Masuk)
+                        Pratinjau Hasil Impor ({validPreviewGuests.length} Tamu Siap Masuk)
                       </span>
                     </div>
-                    {degreeCount > 0 && (
-                      <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <GraduationCap className="w-3 h-3" />
-                        <span>{degreeCount} bergelar akademik</span>
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {degreeCount > 0 && (
+                        <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <GraduationCap className="w-3 h-3" />
+                          <span>{degreeCount} bergelar</span>
+                        </span>
+                      )}
+                      {duplicateCount > 0 && (
+                        <span className="text-[11px] font-semibold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span>⚠️ {duplicateCount} duplikat terdeteksi</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* DUPLICATE PREVENTION TOGGLE */}
+                  {duplicateCount > 0 && (
+                    <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
+                        <input
+                          type="checkbox"
+                          checked={skipDuplicates}
+                          onChange={(e) => setSkipDuplicates(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded border-amber-300 focus:ring-indigo-500"
+                        />
+                        <span>
+                          <strong>Otomatis lewati nama yang sudah ada di database</strong> (Mencegah nama dobel)
+                        </span>
+                      </label>
+                      <span className="text-[11px] text-amber-700 font-bold shrink-0">
+                        {skipDuplicates ? `${duplicateCount} nama dilewati` : 'Akan dimasukkan semua'}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     <table className="w-full text-left text-xs">
@@ -829,11 +883,17 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                           <th className="py-1.5 px-3">Nama Lengkap Tamu</th>
                           <th className="py-1.5 px-3">Instansi / Perusahaan</th>
                           <th className="py-1.5 px-3 w-16 text-center">Pax</th>
+                          <th className="py-1.5 px-3 w-28 text-center">Status Data</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {previewGuests.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
+                          <tr 
+                            key={idx} 
+                            className={`hover:bg-slate-50 transition-colors ${
+                              item.isDuplicate ? (skipDuplicates ? 'bg-amber-50/40 opacity-75' : 'bg-rose-50/40') : ''
+                            }`}
+                          >
                             <td className="py-1.5 px-3 text-slate-400 font-mono text-[11px]">{idx + 1}</td>
                             <td className="py-1.5 px-3 font-bold text-slate-900 break-words">
                               {item.name}
@@ -848,6 +908,17 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                             </td>
                             <td className="py-1.5 px-3 text-center font-semibold text-indigo-600">
                               {item.pax}
+                            </td>
+                            <td className="py-1.5 px-3 text-center">
+                              {item.isDuplicate ? (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full inline-block">
+                                  {skipDuplicates ? 'Dilewati (Dobel)' : 'Duplikat'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
+                                  Nama Baru
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -867,7 +938,8 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
               {/* Modal Actions */}
               <div className="pt-3 flex items-center justify-between border-t border-slate-100">
                 <span className="text-xs text-slate-500 font-medium">
-                  {previewGuests.length} tamu terdeteksi
+                  {validPreviewGuests.length} dari {previewGuests.length} nama siap diimpor
+                  {duplicateCount > 0 && skipDuplicates && ` (${duplicateCount} duplikat diabaikan)`}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -883,13 +955,13 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                   <button
                     type="button"
                     onClick={handleProcessBulk}
-                    disabled={previewGuests.length === 0 || isSubmittingBulk}
+                    disabled={validPreviewGuests.length === 0 || isSubmittingBulk}
                     className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
                   >
                     {isSubmittingBulk ? (
                       <span>Menyimpan ke Supabase...</span>
                     ) : (
-                      <span>Masukkan ke Database ({previewGuests.length})</span>
+                      <span>Masukkan ke Database ({validPreviewGuests.length})</span>
                     )}
                   </button>
                 </div>
@@ -1010,6 +1082,14 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL: DOWNLOAD UNDANGAN & QR CODE (Row 1: Nama, Row 2: QR) */}
+      <DownloadGuestsModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        guests={guests}
+        event={event}
+      />
     </div>
   );
 };
