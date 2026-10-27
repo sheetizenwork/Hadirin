@@ -72,7 +72,7 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1">
-              Nama Lengkap Tamu * <span className="text-rose-500 font-semibold">(Wajib)</span>
+              Nama Lengkap Tamu * <span className="text-rose-500 font-semibold">(Wajib, boleh sertakan gelar)</span>
             </label>
             <input
               type="text"
@@ -80,7 +80,7 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Contoh: Agustinus Lanang"
+              placeholder="Contoh: Tukiman, S.Pd., M.T."
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>

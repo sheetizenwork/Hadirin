@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
@@ -15,12 +15,17 @@ import {
   MapPin, 
   Clock, 
   CheckCircle2, 
-  Users
+  Users,
+  GraduationCap,
+  Sparkles,
+  FileSpreadsheet,
+  HelpCircle
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
 import { generateQRCodeDataURL } from '../../lib/qrUtils';
 import { CheckInSuccessModal } from '../CheckInSuccessModal';
+import { parseBulkGuestInput, ParseMode, ParsedGuestItem } from '../../lib/bulkGuestParser';
 
 interface EventAndGuestsPageProps {
   onOpenAddGuest?: () => void;
@@ -67,9 +72,21 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
   // Check In confirmation modal state
   const [checkInModalGuest, setCheckInModalGuest] = useState<Guest | null>(null);
 
-  // Bulk paste state
+  // Bulk paste state & mode
   const [bulkInputText, setBulkInputText] = useState('');
+  const [bulkParseMode, setBulkParseMode] = useState<ParseMode>('smart');
   const [bulkFeedback, setBulkFeedback] = useState<string | null>(null);
+  const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+
+  // Live parsed preview of guests
+  const previewGuests = useMemo(() => {
+    return parseBulkGuestInput(bulkInputText, bulkParseMode);
+  }, [bulkInputText, bulkParseMode]);
+
+  // Count how many guests in preview have detected degrees
+  const degreeCount = useMemo(() => {
+    return previewGuests.filter((g) => g.hasDegree).length;
+  }, [previewGuests]);
 
   // Edit form state with string pax so backspace works easily
   const [editForm, setEditForm] = useState({
@@ -124,55 +141,23 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     }
   };
 
-  // Bulk Import Parser
-  const handleProcessBulk = () => {
-    if (!bulkInputText.trim()) return;
+  // Bulk Import Executor using parsed preview
+  const handleProcessBulk = async () => {
+    if (previewGuests.length === 0) return;
 
-    const lines = bulkInputText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    const parsed: Array<{
-      name: string;
-      organization?: string;
-      pax?: number;
-    }> = [];
-
-    lines.forEach((line) => {
-      if (line.toLowerCase().startsWith('nama') && (line.includes('instansi') || line.includes('perusahaan'))) {
-        return;
-      }
-
-      let parts: string[] = [];
-      if (line.includes('\t')) {
-        parts = line.split('\t');
-      } else if (line.includes(';') || line.includes(',')) {
-        parts = line.includes(';') ? line.split(';') : line.split(',');
-      } else if (line.includes(' - ')) {
-        parts = line.split(' - ');
-      } else {
-        parts = [line];
-      }
-
-      const cleanParts = parts.map((p) => p.trim().replace(/^["']|["']$/g, ''));
-      const name = cleanParts[0];
-      if (!name) return;
-
-      const org = cleanParts[1] || '';
-      const pax = parseInt(cleanParts[2] || '1', 10) || 1;
-
-      parsed.push({
-        name,
-        organization: org,
-        pax,
-      });
-    });
-
-    if (parsed.length > 0) {
-      const addedCount = bulkAddGuests(parsed);
-      setBulkFeedback(`Berhasil menambahkan ${addedCount} nama tamu sekaligus!`);
+    setIsSubmittingBulk(true);
+    try {
+      const addedCount = await bulkAddGuests(previewGuests);
+      setBulkFeedback(`Berhasil menambahkan ${addedCount} nama tamu sekaligus ke database!`);
       setTimeout(() => {
         setIsBulkModalOpen(false);
         setBulkInputText('');
         setBulkFeedback(null);
+        setIsSubmittingBulk(false);
       }, 1400);
+    } catch (err) {
+      console.error('Error adding bulk guests:', err);
+      setIsSubmittingBulk(false);
     }
   };
 
@@ -643,35 +628,145 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
       {/* MODAL: BULK IMPORT / COPAS NAMA */}
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Copas / Bulk Daftar Tamu
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Tempel daftar nama tamu dari WhatsApp, catatan, atau file CSV
-                </p>
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Copas / Bulk Daftar Tamu Undangan
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Dukung nama bergelar (S.Pd., M.T., dll), copas dari Excel, WhatsApp, atau CSV
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => {
                   setIsBulkModalOpen(false);
                   setBulkFeedback(null);
                 }}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="mt-4 space-y-4">
-              <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-100 rounded-2xl">
-                <div>
-                  <p className="text-xs font-semibold text-indigo-950">Upload File CSV</p>
-                  <p className="text-[11px] text-indigo-700">Pilih file untuk mengisi otomatis</p>
+              {/* Parse Mode Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Pilih Mode Pembacaan Format:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBulkParseMode('smart')}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold text-left border transition-all flex items-center gap-1.5 ${
+                      bulkParseMode === 'smart'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>Smart Gelar (Otomatis)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkParseMode('name_only')}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold text-left border transition-all flex items-center gap-1.5 ${
+                      bulkParseMode === 'name_only'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5 shrink-0" />
+                    <span>Nama Saja Per Baris</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkParseMode('tab')}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold text-left border transition-all flex items-center gap-1.5 ${
+                      bulkParseMode === 'tab'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+                    <span>Tab (Copas Excel)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkParseMode('semicolon')}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold text-left border transition-all ${
+                      bulkParseMode === 'semicolon'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>Pemisah Titik Koma (;)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkParseMode('dash')}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold text-left border transition-all ${
+                      bulkParseMode === 'dash'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>Pemisah Strip ( - )</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkParseMode('pipe')}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold text-left border transition-all ${
+                      bulkParseMode === 'pipe'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>Pemisah Garis ( | )</span>
+                  </button>
                 </div>
-                <label className="cursor-pointer px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors">
-                  <span>Pilih CSV</span>
+              </div>
+
+              {/* Mode Explanation & Upload */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs">
+                <div className="flex items-center gap-2 text-indigo-950">
+                  <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <p>
+                    {bulkParseMode === 'smart' && (
+                      <span><strong>Fitur Smart Gelar Aktif:</strong> Gelar seperti <code>S.Pd.</code>, <code>M.T.</code>, <code>M.Pd.</code>, <code>Dr.</code>, <code>Ph.D.</code> tidak akan dipotong jadi instansi.</span>
+                    )}
+                    {bulkParseMode === 'name_only' && (
+                      <span><strong>Mode Nama Saja:</strong> 100% setiap baris disimpan sebagai nama utuh tamu (aman untuk nama panjang & gelar).</span>
+                    )}
+                    {bulkParseMode === 'tab' && (
+                      <span><strong>Mode Excel:</strong> Kolom dipisah Tab. Kolom 1: Nama, Kolom 2: Instansi, Kolom 3: Pax.</span>
+                    )}
+                    {bulkParseMode === 'semicolon' && (
+                      <span><strong>Format Titik Koma:</strong> <code>Nama ; Instansi ; Pax</code></span>
+                    )}
+                    {bulkParseMode === 'dash' && (
+                      <span><strong>Format Strip:</strong> <code>Nama - Instansi - Pax</code></span>
+                    )}
+                    {bulkParseMode === 'pipe' && (
+                      <span><strong>Format Garis:</strong> <code>Nama | Instansi | Pax</code></span>
+                    )}
+                  </p>
+                </div>
+
+                <label className="cursor-pointer shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors text-center">
+                  <span>Upload CSV</span>
                   <input
                     type="file"
                     accept=".csv,text/csv,text/plain"
@@ -681,27 +776,86 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                 </label>
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
-                <p className="font-semibold text-slate-800 mb-1">Format (Cukup Nama atau Nama, Instansi, Pax):</p>
-                <code className="text-[11px] font-mono text-indigo-600 block bg-white p-2 rounded-lg border border-slate-200">
-                  Agustinus Lanang, PT BCA, 2<br />
-                  Andreas Pok, Kominfo<br />
-                  Ir. Budi Santoso
-                </code>
-              </div>
-
+              {/* Textarea Input */}
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Tempel (Paste) Daftar Tamu:
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Tempel (Paste) Daftar Tamu:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkInputText(
+                        `Tukiman, S.Pd., M.T.\nDra. Hj. Nurjanah, M.Pd.\nBudi Santoso, S.Kom., M.Cs. - SMKN 1 Surabaya - 2\nProf. Dr. Ir. Wahyudi, S.T., M.T.\nAgus Hermanto, S.E., M.M.`
+                      );
+                    }}
+                    className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                  >
+                    + Isi Contoh Nama Bergelar
+                  </button>
+                </div>
                 <textarea
-                  rows={7}
+                  rows={6}
                   value={bulkInputText}
                   onChange={(e) => setBulkInputText(e.target.value)}
-                  placeholder={`Agustinus Lanang, PT BCA, 2\nAndreas Pok, Kominfo\nIr. Budi Santoso`}
+                  placeholder={`Contoh:\nTukiman, S.Pd., M.T.\nDra. Hj. Nurjanah, M.Pd.\nBudi Santoso, S.Kom. - SMKN 1 - 2`}
                   className="w-full p-3 font-mono text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
+
+              {/* LIVE PREVIEW BOX */}
+              {previewGuests.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-bold text-slate-900">
+                        Pratinjau Hasil Impor ({previewGuests.length} Tamu Siap Masuk)
+                      </span>
+                    </div>
+                    {degreeCount > 0 && (
+                      <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <GraduationCap className="w-3 h-3" />
+                        <span>{degreeCount} bergelar akademik</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 text-slate-600 font-semibold sticky top-0">
+                        <tr>
+                          <th className="py-1.5 px-3 w-8">#</th>
+                          <th className="py-1.5 px-3">Nama Lengkap Tamu</th>
+                          <th className="py-1.5 px-3">Instansi / Perusahaan</th>
+                          <th className="py-1.5 px-3 w-16 text-center">Pax</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {previewGuests.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="py-1.5 px-3 text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                            <td className="py-1.5 px-3 font-bold text-slate-900 break-words">
+                              {item.name}
+                              {item.hasDegree && (
+                                <span className="ml-1.5 text-[10px] font-normal text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                  Gelar
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-1.5 px-3 text-slate-600">
+                              {item.organization ? item.organization : <span className="text-slate-300 italic">—</span>}
+                            </td>
+                            <td className="py-1.5 px-3 text-center font-semibold text-indigo-600">
+                              {item.pax}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {bulkFeedback && (
                 <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
@@ -710,9 +864,10 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                 </div>
               )}
 
+              {/* Modal Actions */}
               <div className="pt-3 flex items-center justify-between border-t border-slate-100">
-                <span className="text-xs text-slate-400">
-                  {bulkInputText.split(/\r?\n/).filter((l) => l.trim()).length} baris
+                <span className="text-xs text-slate-500 font-medium">
+                  {previewGuests.length} tamu terdeteksi
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -728,10 +883,14 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                   <button
                     type="button"
                     onClick={handleProcessBulk}
-                    disabled={!bulkInputText.trim()}
-                    className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-sm"
+                    disabled={previewGuests.length === 0 || isSubmittingBulk}
+                    className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
                   >
-                    Masukkan ke Database
+                    {isSubmittingBulk ? (
+                      <span>Menyimpan ke Supabase...</span>
+                    ) : (
+                      <span>Masukkan ke Database ({previewGuests.length})</span>
+                    )}
                   </button>
                 </div>
               </div>
