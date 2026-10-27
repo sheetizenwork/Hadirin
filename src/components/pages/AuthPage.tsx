@@ -58,7 +58,7 @@ export const AuthPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Hadirin</h1>
           <p className="text-sm text-slate-400 mt-1">
-            Sistem Presensi Tamu Acara & QR Scanner (Terkoneksi Supabase)
+            Sistem Presensi Tamu Acara & QR Scanner
           </p>
         </div>
 

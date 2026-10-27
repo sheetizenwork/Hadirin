@@ -4,7 +4,11 @@ import {
   Printer, 
   Search, 
   CheckCircle2, 
-  Building2 
+  Building2,
+  Users,
+  UserCheck,
+  UserX,
+  TrendingUp
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { exportToExcel, triggerPrintReport } from '../../lib/exportUtils';
@@ -111,30 +115,78 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary KPI Strip (No-print) */}
-      <div className="no-print grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Total Tamu Undangan</span>
-          <p className="text-2xl font-extrabold text-slate-900 font-mono tabular-nums mt-1">{totalGuests}</p>
-          <span className="text-[11px] text-slate-400">Total kuota: {totalInvitedPax} Orang</span>
+      {/* Summary KPI Strip (No-print) - Identical to Dashboard */}
+      <div className="no-print grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* Card 1: Total Tamu */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-slate-500">Total Tamu Undangan</span>
+            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tabular-nums">
+              {totalGuests}
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm">
-          <span className="text-xs text-emerald-700 font-medium">Tamu Sudah Hadir</span>
-          <p className="text-2xl font-extrabold text-emerald-700 font-mono tabular-nums mt-1">{attendedGuests.length}</p>
-          <span className="text-[11px] text-emerald-600">Aktual: {totalActualPax} Orang</span>
+        {/* Card 2: Sudah Hadir */}
+        <div className="bg-white rounded-2xl p-5 border border-emerald-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-emerald-700">Sudah Hadir</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+              <UserCheck className="w-5 h-5" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 font-mono tabular-nums">
+              {attendedGuests.length}
+            </div>
+            <p className="text-xs text-emerald-600 mt-1">
+              Aktual masuk: <span className="font-semibold tabular-nums">{totalActualPax} orang</span>
+            </p>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm">
-          <span className="text-xs text-amber-700 font-medium">Tamu Belum Datang</span>
-          <p className="text-2xl font-extrabold text-amber-700 font-mono tabular-nums mt-1">{pendingGuests.length}</p>
-          <span className="text-[11px] text-amber-600">Menunggu di pintu</span>
+        {/* Card 3: Belum Hadir */}
+        <div className="bg-white rounded-2xl p-5 border border-amber-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-amber-700">Belum Hadir</span>
+            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+              <UserX className="w-5 h-5" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-amber-700 font-mono tabular-nums">
+              {pendingGuests.length}
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-indigo-200 shadow-sm">
-          <span className="text-xs text-indigo-700 font-medium">Tingkat Kehadiran</span>
-          <p className="text-2xl font-extrabold text-indigo-700 font-mono tabular-nums mt-1">{percentAttended}%</p>
-          <span className="text-[11px] text-indigo-500">Persentase kehadiran</span>
+        {/* Card 4: Tingkat Kehadiran */}
+        <div className="bg-white rounded-2xl p-5 border border-indigo-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-indigo-700">Tingkat Kehadiran</span>
+            <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-indigo-700 font-mono tabular-nums">
+              {percentAttended}%
+            </div>
+            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-1.5">
+              <div
+                className="bg-indigo-600 h-full rounded-full transition-all duration-700"
+                style={{ width: `${percentAttended}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              Jumlah undangan {totalGuests} · Sudah hadir {attendedGuests.length} · Belum hadir {pendingGuests.length}
+            </p>
+          </div>
         </div>
       </div>
 

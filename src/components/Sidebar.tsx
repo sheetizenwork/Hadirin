@@ -8,14 +8,13 @@ import {
   LogOut, 
   Sparkles,
   ChevronRight,
-  ShieldCheck,
-  RotateCcw
+  ShieldCheck
 } from 'lucide-react';
 import { useAttendance } from '../context/AttendanceContext';
 import { ActiveTab } from '../types';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, user, logout, event, guests, resetToDemoData } = useAttendance();
+  const { activeTab, setActiveTab, user, logout, event, guests, refreshFromSupabase } = useAttendance();
 
   const totalGuests = guests.length;
   const attendedGuests = guests.filter((g) => g.status === 'checked_in').length;
@@ -71,7 +70,10 @@ export const Sidebar: React.FC = () => {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                refreshFromSupabase();
+              }}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
@@ -138,15 +140,6 @@ export const Sidebar: React.FC = () => {
             </button>
           </div>
         )}
-
-        <button
-          onClick={resetToDemoData}
-          className="w-full mt-1 flex items-center justify-center gap-2 text-[11px] text-slate-400 hover:text-slate-200 py-1.5 rounded-lg hover:bg-slate-800/60 transition-colors"
-          title="Reset ke data awal"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Reset Demo Data</span>
-        </button>
       </div>
     </aside>
   );

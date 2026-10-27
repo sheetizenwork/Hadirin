@@ -75,9 +75,9 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
   });
 
   // Fetch Event & Guests directly from Supabase table
-  const refreshFromSupabase = useCallback(async () => {
+  const refreshFromSupabase = useCallback(async (isInitial = false) => {
     try {
-      setIsLoading(true);
+      if (isInitial) setIsLoading(true);
 
       // 1. Fetch Event from Supabase
       const { data: eventData, error: eventErr } = await supabase
@@ -119,9 +119,35 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     } catch (err) {
       console.error('Error fetching Supabase data:', err);
     } finally {
-      setIsLoading(false);
+      if (isInitial) setIsLoading(false);
     }
   }, []);
+
+  // When switching tabs to Dashboard, Guests, or Reports, fetch fresh data immediately
+  const handleSetActiveTab = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+    if (tab === 'dashboard' || tab === 'guests' || tab === 'reports' || tab === 'scanner') {
+      refreshFromSupabase();
+    }
+  }, [refreshFromSupabase]);
+
+  // Window Focus & Cross-Device Heartbeat (Laptop & HP sync seamlessly without reload)
+  useEffect(() => {
+    const handleFocus = () => {
+      refreshFromSupabase();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Heartbeat every 4 seconds to guarantee multi-device sync
+    const interval = setInterval(() => {
+      refreshFromSupabase();
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [refreshFromSupabase]);
 
   // Initialize Supabase Auth & load data immediately on mount
   useEffect(() => {
@@ -677,7 +703,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         isLoading,
         authError,
         isSupabaseConnected,
-        setActiveTab,
+        setActiveTab: handleSetActiveTab,
         login,
         signUp,
         logout,

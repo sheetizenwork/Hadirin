@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
+import { formatTime } from '../../lib/dateUtils';
 
 interface DashboardPageProps {
   onOpenAddGuest: () => void;
@@ -72,7 +73,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenAddGuest }) 
               <span className="hidden sm:inline">·</span>
               <span>📅 {new Date(event.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
               <span className="hidden sm:inline">·</span>
-              <span>⏰ {event.time_start} - {event.time_end} WIB</span>
+              <span>⏰ {formatTime(event.time_start)} - {formatTime(event.time_end)} WIB</span>
             </p>
           </div>
 

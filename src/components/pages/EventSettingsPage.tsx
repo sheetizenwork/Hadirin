@@ -6,10 +6,7 @@ import {
   Building, 
   Save, 
   CheckCircle2, 
-  Sparkles, 
-  Cloud, 
-  Database, 
-  GitBranch,
+  Sparkles,
   ShieldCheck,
   RotateCcw
 } from 'lucide-react';
@@ -183,58 +180,6 @@ export const EventSettingsPage: React.FC = () => {
             </button>
           </div>
         </form>
-      </div>
-
-      {/* Cloudflare Pages & Supabase Status Card */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-indigo-400">
-            <Sparkles className="w-4 h-4" />
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Status Integrasi & Panduan Cloudflare Pages
-            </h3>
-          </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Supabase Terkoneksi</span>
-          </div>
-        </div>
-
-        <p className="text-xs text-slate-300 leading-relaxed">
-          Aplikasi Hadirin saat ini sudah terhubung langsung ke project Supabase Anda (<span className="text-emerald-400 font-mono">jbyfsdysbdcgcmmnvmxa.supabase.co</span>) dengan autentikasi akun pengelola, penyimpanan real-time, dan pembaruan riwayat kehadiran.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-          <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 mb-1">
-              <GitBranch className="w-4 h-4" />
-              <span>1. GitHub Push</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Download kode ini, lalu push ke repository GitHub Anda (<code className="text-white font-mono">git push origin main</code>).
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 mb-1">
-              <Cloud className="w-4 h-4" />
-              <span>2. Cloudflare Pages</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Connect repo di Cloudflare Pages. Build command: <code className="text-white font-mono">npm run build</code>, output directory: <code className="text-white font-mono">dist</code>.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 mb-1">
-              <Database className="w-4 h-4" />
-              <span>3. Environment Vars</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Tambahkan <code className="text-white font-mono">VITE_SUPABASE_URL</code> dan <code className="text-white font-mono">VITE_SUPABASE_ANON_KEY</code> di Settings Cloudflare Pages.
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

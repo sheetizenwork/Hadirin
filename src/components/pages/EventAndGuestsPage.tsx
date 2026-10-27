@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
+import { formatTime } from '../../lib/dateUtils';
 import { generateQRCodeDataURL } from '../../lib/qrUtils';
 import { CheckInSuccessModal } from '../CheckInSuccessModal';
 import { DownloadGuestsModal } from '../DownloadGuestsModal';
@@ -355,7 +356,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
             </div>
             <div className="flex items-center gap-2.5 text-xs text-slate-600">
               <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>{event.time_start} - {event.time_end} WIB</span>
+              <span>{formatTime(event.time_start)} - {formatTime(event.time_end)} WIB</span>
             </div>
             <div className="flex items-center gap-2.5 text-xs text-slate-600">
               <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
