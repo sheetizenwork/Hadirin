@@ -112,6 +112,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenAddGuest }) 
             <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tabular-nums">
               {totalGuests}
             </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Kapasitas: <span className="font-semibold text-slate-700 tabular-nums">{totalPaxInvited} orang</span>
+            </p>
           </div>
         </div>
 
