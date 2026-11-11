@@ -10,10 +10,38 @@ import { EventAndGuestsPage } from './components/pages/EventAndGuestsPage';
 import { QRScannerPage } from './components/pages/QRScannerPage';
 import { ReportsPage } from './components/pages/ReportsPage';
 import { EventSettingsPage } from './components/pages/EventSettingsPage';
+import { MonitorDisplayPage } from './components/pages/MonitorDisplayPage';
+import { MonitorSettingsPage } from './components/pages/MonitorSettingsPage';
 
 const MainAppContent: React.FC = () => {
-  const { user, activeTab, isLoading } = useAttendance();
+  const { user, activeTab, setActiveTab, isLoading } = useAttendance();
   const [isAddGuestModalOpen, setIsAddGuestModalOpen] = useState(false);
+
+  // Sync URL path /monitor with activeTab on initial mount & popstate
+  React.useEffect(() => {
+    const checkPath = () => {
+      const pathname = window.location.pathname.toLowerCase();
+      if (pathname === '/monitor' || pathname.startsWith('/monitor')) {
+        setActiveTab('monitor');
+      }
+    };
+    checkPath();
+    window.addEventListener('popstate', checkPath);
+    return () => window.removeEventListener('popstate', checkPath);
+  }, [setActiveTab]);
+
+  // Keep window.location.pathname in sync when user switches tabs
+  React.useEffect(() => {
+    if (activeTab === 'monitor') {
+      if (window.location.pathname !== '/monitor') {
+        window.history.pushState({}, '', '/monitor');
+      }
+    } else {
+      if (window.location.pathname === '/monitor') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }, [activeTab]);
 
   // If loading session
   if (isLoading && !user) {
@@ -22,6 +50,22 @@ const MainAppContent: React.FC = () => {
         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-xs text-slate-400 font-mono tracking-wider">Menghubungkan ke Supabase...</p>
       </div>
+    );
+  }
+
+  // If user is accessing /monitor or 'monitor' tab, show immersive full screen without login or with login
+  if (activeTab === 'monitor' || window.location.pathname === '/monitor') {
+    return (
+      <MonitorDisplayPage
+        onBackToApp={() => {
+          window.history.pushState({}, '', '/');
+          setActiveTab('dashboard');
+        }}
+        onOpenSettings={() => {
+          window.history.pushState({}, '', '/');
+          setActiveTab('monitor_settings');
+        }}
+      />
     );
   }
 
@@ -55,6 +99,8 @@ const MainAppContent: React.FC = () => {
           {activeTab === 'scanner' && <QRScannerPage />}
 
           {activeTab === 'reports' && <ReportsPage />}
+
+          {activeTab === 'monitor_settings' && <MonitorSettingsPage />}
 
           {activeTab === 'event_settings' && <EventSettingsPage />}
         </main>

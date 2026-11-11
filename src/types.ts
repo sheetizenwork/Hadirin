@@ -40,4 +40,18 @@ export interface ScanLog {
   message: string;
 }
 
-export type ActiveTab = 'dashboard' | 'guests' | 'scanner' | 'reports' | 'event_settings';
+export interface MonitorSettings {
+  showEventName: boolean;
+  customEventTitle?: string;      // Judul khusus tampilan monitor (bisa pakai enter / multi-baris)
+  showOrganizer: boolean;
+  showDate: boolean;
+  showWelcomeCard: boolean;       // Kartu sambutan utama (Bapak/Ibu ...)
+  showGuestOrganization: boolean;
+  showGuestPax: boolean;
+  showLiveTicker: boolean;
+  liveTickerCount: number;        // e.g. 3, 5, 8, 10
+  showMiniCounter: boolean;
+  showFooter: boolean;            // Teks footer bawah
+}
+
+export type ActiveTab = 'dashboard' | 'guests' | 'scanner' | 'reports' | 'event_settings' | 'monitor' | 'monitor_settings';

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Guest, EventDetails, UserProfile, ScanLog, ActiveTab } from '../types';
+import { Guest, EventDetails, UserProfile, ScanLog, ActiveTab, MonitorSettings } from '../types';
 import { INITIAL_EVENT } from '../lib/mockData';
 import { playSuccessChime, playErrorBuzz } from '../lib/audioFeedback';
 import { supabase } from '../lib/supabase';
@@ -20,6 +20,10 @@ interface AttendanceContextType {
   isLoading: boolean;
   authError: string | null;
   isSupabaseConnected: boolean;
+  monitorSettings: MonitorSettings;
+  updateMonitorSettings: (settings: Partial<MonitorSettings>) => void;
+  latestCheckedInGuest: Guest | null;
+  clearLatestGuest: () => void;
   setActiveTab: (tab: ActiveTab) => void;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password?: string, name?: string) => Promise<{ success: boolean; error?: string }>;
@@ -58,6 +62,43 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
   const [event, setEvent] = useState<EventDetails>(INITIAL_EVENT);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [scanLogs, setScanLogs] = useState<ScanLog[]>([]);
+  const [latestCheckedInGuest, setLatestCheckedInGuest] = useState<Guest | null>(null);
+
+  // Monitor Display Settings with localStorage persistence
+  const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>(() => {
+    const saved = localStorage.getItem('hadirin_monitor_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse monitor settings', e);
+      }
+    }
+    return {
+      showEventName: true,
+      showOrganizer: true,
+      showDate: true,
+      showWelcomeCard: true,
+      showGuestOrganization: true,
+      showGuestPax: true,
+      showLiveTicker: true,
+      liveTickerCount: 5,
+      showMiniCounter: true,
+      showFooter: true,
+    };
+  });
+
+  const updateMonitorSettings = (newSettings: Partial<MonitorSettings>) => {
+    setMonitorSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      localStorage.setItem('hadirin_monitor_settings', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const clearLatestGuest = () => {
+    setLatestCheckedInGuest(null);
+  };
 
   // Map Supabase DB row to Guest type
   const mapRowToGuest = (row: Record<string, unknown>): Guest => ({
@@ -113,8 +154,30 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         console.warn('Guests table query notice:', guestErr.message);
       } else if (guestRows) {
         // Zero dummy data! If 0 rows in Supabase, guests is []
-        setGuests(guestRows.map(mapRowToGuest));
+        const mappedList = guestRows.map(mapRowToGuest);
+        setGuests(mappedList);
         setIsSupabaseConnected(true);
+
+        // Find the newest checked-in guest from the fetched data
+        const attended = mappedList.filter((g) => g.status === 'checked_in');
+        if (attended.length > 0) {
+          const newest = [...attended].sort((a, b) => {
+            const timeA = new Date(a.checked_in_at || 0).getTime();
+            const timeB = new Date(b.checked_in_at || 0).getTime();
+            return timeB - timeA;
+          })[0];
+
+          setLatestCheckedInGuest((prev) => {
+            if (!prev) return newest;
+            const prevTime = new Date(prev.checked_in_at || 0).getTime();
+            const newestTime = new Date(newest.checked_in_at || 0).getTime();
+            // If the newest guest has a different ID or a newer check-in timestamp
+            if (newest.id !== prev.id || newestTime > prevTime) {
+              return newest;
+            }
+            return prev;
+          });
+        }
       }
     } catch (err) {
       console.error('Error fetching Supabase data:', err);
@@ -133,23 +196,25 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Window Focus & Cross-Device Heartbeat (Laptop & HP sync seamlessly without reload)
   useEffect(() => {
-    if (!user) return;
+    const isMonitor = activeTab === 'monitor' || window.location.pathname === '/monitor';
+    if (!user && !isMonitor) return;
 
     const handleFocus = () => {
       refreshFromSupabase();
     };
     window.addEventListener('focus', handleFocus);
 
-    // Heartbeat every 4 seconds to guarantee multi-device sync
+    // Heartbeat every 2.5 seconds on monitor to guarantee instantaneous sync
+    const intervalDuration = isMonitor ? 2500 : 4000;
     const interval = setInterval(() => {
       refreshFromSupabase();
-    }, 4000);
+    }, intervalDuration);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
     };
-  }, [refreshFromSupabase, user]);
+  }, [refreshFromSupabase, user, activeTab]);
 
   // Initialize Supabase Auth & load data immediately on mount
   useEffect(() => {
@@ -205,21 +270,43 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Real-time Supabase Subscription for Guests table
   useEffect(() => {
-    if (!user) return;
+    const isMonitor = activeTab === 'monitor' || window.location.pathname === '/monitor';
+    if (!user && !isMonitor) return;
 
     const channel = supabase
       .channel('public:guests_realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'guests' },
-        () => {
+        (payload) => {
+          // Check if payload is an UPDATE with checked_in status or a newly checked-in guest
+          if (payload.new && typeof payload.new === 'object') {
+            const updatedRow = payload.new as Record<string, unknown>;
+            if (updatedRow.status === 'checked_in') {
+              const mapped = mapRowToGuest(updatedRow);
+              setLatestCheckedInGuest(mapped);
+            }
+          }
+
           // Whenever any phone or dashboard updates guests in Supabase, re-sync live!
           supabase
             .from('guests')
             .select('*')
             .order('created_at', { ascending: false })
             .then(({ data }) => {
-              if (data) setGuests(data.map(mapRowToGuest));
+              if (data) {
+                const mapped = data.map(mapRowToGuest);
+                setGuests(mapped);
+                const attended = mapped.filter((g) => g.status === 'checked_in');
+                if (attended.length > 0) {
+                  const newest = [...attended].sort((a, b) => {
+                    const timeA = new Date(a.checked_in_at || 0).getTime();
+                    const timeB = new Date(b.checked_in_at || 0).getTime();
+                    return timeB - timeA;
+                  })[0];
+                  setLatestCheckedInGuest(newest);
+                }
+              }
             });
         }
       )
@@ -228,7 +315,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, activeTab]);
 
   // Auth Operations
   const login = async (email: string, password = ''): Promise<{ success: boolean; error?: string }> => {
@@ -603,6 +690,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     setGuests((prev) =>
       prev.map((g) => (g.id === target.id ? updatedGuest : g))
     );
+    setLatestCheckedInGuest(updatedGuest);
 
     const timeStr = new Date(nowTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
@@ -716,6 +804,10 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         isLoading,
         authError,
         isSupabaseConnected,
+        monitorSettings,
+        updateMonitorSettings,
+        latestCheckedInGuest,
+        clearLatestGuest,
         setActiveTab: handleSetActiveTab,
         login,
         signUp,

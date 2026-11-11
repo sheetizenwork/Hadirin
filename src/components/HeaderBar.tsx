@@ -46,6 +46,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ onOpenAddGuest }) => {
         return 'Scan QR Presensi';
       case 'reports':
         return 'Laporan & Ekspor Data';
+      case 'monitor':
+        return 'Layar Monitor Presensi';
+      case 'monitor_settings':
+        return 'Pengaturan Tampilan Monitor';
       case 'event_settings':
         return 'Informasi & Pengaturan Acara';
       default:

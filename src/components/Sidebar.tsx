@@ -8,7 +8,9 @@ import {
   LogOut, 
   Sparkles,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Tv,
+  Sliders
 } from 'lucide-react';
 import { useAttendance } from '../context/AttendanceContext';
 import { ActiveTab } from '../types';
@@ -25,6 +27,8 @@ export const Sidebar: React.FC = () => {
     { id: 'scanner', label: 'Scan QR Presensi', icon: QrCode },
     { id: 'guests', label: 'Pengelolaan Tamu', icon: Users, badge: totalGuests },
     { id: 'reports', label: 'Laporan Kehadiran', icon: FileSpreadsheet },
+    { id: 'monitor', label: 'Monitor', icon: Tv },
+    { id: 'monitor_settings', label: 'Pengaturan Monitor', icon: Sliders },
     { id: 'event_settings', label: 'Pengaturan Acara', icon: Settings2 },
   ];
 
