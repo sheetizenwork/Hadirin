@@ -5,6 +5,7 @@ export interface Guest {
   qr_code: string;
   name: string;
   organization: string; // opsional: instansi/perusahaan
+  seat?: string;        // opsional: tempat duduk / meja / kursi
   pax: number;          // berapa orang yang diundang (default 1)
   status: AttendanceStatus;
   checked_in_at: string | null;      // waktu presensi terbaru
@@ -47,6 +48,7 @@ export interface MonitorSettings {
   showDate: boolean;
   showWelcomeCard: boolean;       // Kartu sambutan utama (Bapak/Ibu ...)
   showGuestOrganization: boolean;
+  showGuestSeat?: boolean;        // Tampilkan tempat duduk / meja tamu
   showGuestPax: boolean;
   showLiveTicker: boolean;
   liveTickerCount: number;        // e.g. 3, 5, 8, 10

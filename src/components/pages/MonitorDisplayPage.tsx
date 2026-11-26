@@ -10,7 +10,8 @@ import {
   ArrowLeft,
   Sliders,
   Volume2,
-  VolumeX
+  VolumeX,
+  Armchair
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
@@ -269,6 +270,14 @@ export const MonitorDisplayPage: React.FC<MonitorDisplayPageProps> = ({
                         <span>Hadir: {currentWelcomedGuest.actual_pax || currentWelcomedGuest.pax || 1} Orang</span>
                       </div>
                     )}
+
+                    {/* Tempat Duduk / Seat Tag */}
+                    {monitorSettings.showGuestSeat !== false && currentWelcomedGuest.seat && currentWelcomedGuest.seat.trim() && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-500/15 border border-amber-400/50 text-amber-200 text-xs sm:text-sm font-bold shadow-sm shadow-amber-500/10">
+                        <Armchair className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Tempat Duduk: {currentWelcomedGuest.seat}</span>
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-xs text-slate-400 pt-1">
@@ -392,6 +401,12 @@ export const MonitorDisplayPage: React.FC<MonitorDisplayPageProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {monitorSettings.showGuestSeat !== false && g.seat && g.seat.trim() && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-amber-950/90 border border-amber-500/40 text-amber-300 font-semibold">
+                          <Armchair className="w-3 h-3 text-amber-400" />
+                          <span>{g.seat}</span>
+                        </span>
+                      )}
                       {monitorSettings.showGuestPax && (
                         <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 border border-emerald-800/80 text-emerald-300 font-mono">
                           {g.actual_pax || g.pax || 1} Org

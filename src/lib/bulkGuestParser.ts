@@ -6,10 +6,20 @@
 export interface ParsedGuestItem {
   name: string;
   organization: string;
+  seat: string;
   pax: number;
   hasDegree?: boolean;
   isDuplicate?: boolean;
   duplicateReason?: 'already_in_db' | 'duplicate_in_input';
+}
+
+export interface ParsedSeatUpdateItem {
+  inputName: string;
+  newSeat: string;
+  matchedGuestId?: string;
+  matchedGuestName?: string;
+  currentSeat?: string;
+  status: 'matched' | 'unchanged' | 'not_found';
 }
 
 // Regex for common Indonesian and international academic titles & professional degrees
@@ -80,7 +90,7 @@ export function parseBulkGuestInput(
     const lower = line.toLowerCase();
     if (
       (lower.startsWith('nama') || lower.startsWith('name')) &&
-      (lower.includes('instansi') || lower.includes('perusahaan') || lower.includes('pax') || lower.includes('jumlah'))
+      (lower.includes('instansi') || lower.includes('perusahaan') || lower.includes('pax') || lower.includes('jumlah') || lower.includes('duduk') || lower.includes('kursi') || lower.includes('seat') || lower.includes('meja'))
     ) {
       continue;
     }
@@ -93,6 +103,7 @@ export function parseBulkGuestInput(
         item = {
           name: cleanName,
           organization: '',
+          seat: '',
           pax: 1,
           hasDegree: cleanName.includes(',') && cleanName.split(',').slice(1).some(isAcademicDegree),
         };
@@ -123,6 +134,7 @@ export function parseBulkGuestInput(
           item = {
             name: clean,
             organization: '',
+            seat: '',
             pax: 1,
           };
         }
@@ -155,6 +167,7 @@ function parseSeparatedLine(parts: string[]): ParsedGuestItem {
   const name = cleanParts[0] || '';
   const org = cleanParts[1] || '';
   const rawPax = cleanParts[2] || '';
+  const seat = cleanParts[3] || '';
   const parsedPax = parseInt(rawPax, 10);
   const pax = isNaN(parsedPax) || parsedPax < 1 ? 1 : parsedPax;
 
@@ -163,6 +176,7 @@ function parseSeparatedLine(parts: string[]): ParsedGuestItem {
   return {
     name,
     organization: org,
+    seat,
     pax,
     hasDegree,
   };
@@ -204,6 +218,7 @@ function parseSmartCommaLine(line: string): ParsedGuestItem | null {
     return {
       name: rawChunks[0],
       organization: '',
+      seat: '',
       pax: 1,
     };
   }
@@ -211,6 +226,7 @@ function parseSmartCommaLine(line: string): ParsedGuestItem | null {
   // Chunk 0 is the beginning of the name (e.g. "Tukiman" or "Drs. H. Tukiman")
   let nameParts: string[] = [rawChunks[0]];
   let org = '';
+  let seat = '';
   let pax = 1;
   let degreeDetected = false;
 
@@ -250,7 +266,127 @@ function parseSmartCommaLine(line: string): ParsedGuestItem | null {
   return {
     name: fullName,
     organization: org,
+    seat,
     pax,
     hasDegree: degreeDetected,
   };
+}
+
+/**
+ * Normalize guest name for resilient matching (case-insensitive, collapse extra spaces)
+ */
+function normalizeGuestName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Parse 2-column (or multi-column) paste from Excel/Sheets/CSV to match existing guests and update their seats
+ * Supports:
+ * - Tab (direct copy-paste 2 columns from Excel/Google Sheets: Nama [Tab] Tempat Duduk)
+ * - Semicolon (Nama ; Tempat Duduk)
+ * - Pipe (Nama | Tempat Duduk)
+ * - Dash (Nama - Tempat Duduk)
+ * - CSV quoted lines ("Tukiman, S.Pd., M.T.", "VIP A-01")
+ */
+export function parseBulkSeatUpdates(
+  rawText: string,
+  existingGuests: Array<{ id: string; name: string; seat?: string }>
+): ParsedSeatUpdateItem[] {
+  if (!rawText || !rawText.trim()) return [];
+
+  const guestByExactName = new Map<string, { id: string; name: string; seat?: string }>();
+  for (const g of existingGuests) {
+    guestByExactName.set(normalizeGuestName(g.name), g);
+  }
+
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  const results: ParsedSeatUpdateItem[] = [];
+
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    // Skip header rows
+    if (
+      (lower.startsWith('nama') || lower.startsWith('name') || lower.startsWith('"nama')) &&
+      (lower.includes('duduk') || lower.includes('kursi') || lower.includes('seat') || lower.includes('meja') || lower.includes('instansi'))
+    ) {
+      continue;
+    }
+
+    let parts: string[] = [];
+    if (line.includes('\t')) {
+      parts = line.split('\t').map((p) => p.trim().replace(/^["']|["']$/g, ''));
+    } else if (line.includes('|')) {
+      parts = line.split('|').map((p) => p.trim().replace(/^["']|["']$/g, ''));
+    } else if (line.includes(';')) {
+      parts = line.split(';').map((p) => p.trim().replace(/^["']|["']$/g, ''));
+    } else if (line.includes(' - ')) {
+      parts = line.split(' - ').map((p) => p.trim().replace(/^["']|["']$/g, ''));
+    } else if (line.includes('"') && line.includes(',')) {
+      const matches: string[] = [];
+      let match;
+      const csvRegex = /(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^",\n]*|(?:\n|$))/g;
+      while ((match = csvRegex.exec(line)) !== null) {
+        let val = match[1];
+        if (val !== undefined) {
+          if (val.startsWith('"') && val.endsWith('"')) {
+            val = val.slice(1, -1).replace(/""/g, '"');
+          }
+          matches.push(val.trim());
+        }
+        if (match.index === csvRegex.lastIndex) {
+          csvRegex.lastIndex++;
+        }
+      }
+      parts = matches.filter((m, idx) => idx < matches.length - 1 || m.length > 0);
+    } else if (line.includes(',')) {
+      // Smart comma: separate academic titles from final seat value
+      const chunks = line.split(',').map((c) => c.trim()).filter((c) => c.length > 0);
+      if (chunks.length >= 2) {
+        const last = chunks[chunks.length - 1];
+        if (!isAcademicDegree(last)) {
+          parts = [chunks.slice(0, -1).join(', '), last];
+        } else {
+          parts = [line, ''];
+        }
+      }
+    } else {
+      continue;
+    }
+
+    if (parts.length < 2) continue;
+
+    // First column is always Name; last column is Seat (handles 2-col "Nama | Seat", 3-col "Nama | Instansi | Seat", or 4-col "Nama | Instansi | Pax | Seat")
+    // Also skip leading number column if someone copied "No | Nama | Tempat Duduk"
+    let inputName = parts[0] || '';
+    let newSeat = parts[parts.length - 1] || '';
+
+    if (/^\d+$/.test(inputName) && parts.length >= 3) {
+      inputName = parts[1] || '';
+    }
+
+    inputName = inputName.trim();
+    newSeat = newSeat.trim();
+    if (!inputName) continue;
+
+    const matched = guestByExactName.get(normalizeGuestName(inputName));
+    if (matched) {
+      const currentSeat = (matched.seat || '').trim();
+      results.push({
+        inputName,
+        newSeat,
+        matchedGuestId: matched.id,
+        matchedGuestName: matched.name,
+        currentSeat,
+        status: currentSeat === newSeat ? 'unchanged' : 'matched',
+      });
+    } else {
+      results.push({
+        inputName,
+        newSeat,
+        status: 'not_found',
+      });
+    }
+  }
+
+  return results;
 }

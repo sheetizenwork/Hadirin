@@ -12,6 +12,7 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
 
   const [name, setName] = useState('');
   const [organization, setOrganization] = useState('');
+  const [seat, setSeat] = useState('');
   const [paxInput, setPaxInput] = useState('1');
 
   if (!isOpen) return null;
@@ -32,12 +33,14 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
     addGuest({
       name: trimmedName,
       organization: organization.trim(),
+      seat: seat.trim(),
       pax: finalPax,
     });
 
     // Reset and close
     setName('');
     setOrganization('');
+    setSeat('');
     setPaxInput('1');
     onClose();
   };
@@ -122,20 +125,35 @@ export const AddGuestModal: React.FC<AddGuestModalProps> = ({ isOpen, onClose })
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Berapa Orang yang Diundang / Pax <span className="text-slate-400 font-normal">(Opsional, default 1)</span>
-            </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={paxInput}
-              onChange={(e) => handlePaxChange(e.target.value)}
-              onBlur={handlePaxBlur}
-              placeholder="1"
-              className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tempat Duduk <span className="text-slate-400 font-normal">(Opsional)</span>
+              </label>
+              <input
+                type="text"
+                value={seat}
+                onChange={(e) => setSeat(e.target.value)}
+                placeholder="Contoh: VIP A-01 / Meja 5"
+                className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Jumlah / Pax <span className="text-slate-400 font-normal">(Default 1)</span>
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={paxInput}
+                onChange={(e) => handlePaxChange(e.target.value)}
+                onBlur={handlePaxBlur}
+                placeholder="1"
+                className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold"
+              />
+            </div>
           </div>
 
           <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">

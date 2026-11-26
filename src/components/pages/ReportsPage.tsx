@@ -30,7 +30,8 @@ export const ReportsPage: React.FC = () => {
     const q = searchQuery.toLowerCase();
     const matchQ =
       g.name.toLowerCase().includes(q) ||
-      (g.organization && g.organization.toLowerCase().includes(q));
+      (g.organization && g.organization.toLowerCase().includes(q)) ||
+      (g.seat && g.seat.toLowerCase().includes(q));
 
     const matchStatus =
       statusFilter === 'all' ||
@@ -201,7 +202,7 @@ export const ReportsPage: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama tamu atau instansi..."
+            placeholder="Cari nama tamu, instansi, atau tempat duduk..."
             className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
         </div>
@@ -228,6 +229,7 @@ export const ReportsPage: React.FC = () => {
                 <th className="py-3 px-3 w-12 text-center">No</th>
                 <th className="py-3 px-4">Nama Lengkap Tamu</th>
                 <th className="py-3 px-4">Instansi / Perusahaan</th>
+                <th className="py-3 px-4">Tempat Duduk</th>
                 <th className="py-3 px-3 text-center">Undangan</th>
                 <th className="py-3 px-3 text-center">Hadir Aktual</th>
                 <th className="py-3 px-4">Status</th>
@@ -237,7 +239,7 @@ export const ReportsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredGuests.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     Tidak ada catatan kehadiran yang sesuai filter.
                   </td>
                 </tr>
@@ -259,6 +261,15 @@ export const ReportsPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-slate-600 break-words whitespace-normal">
                         {guest.organization || '-'}
+                      </td>
+                      <td className="py-3 px-4 break-words whitespace-normal">
+                        {guest.seat && guest.seat.trim() ? (
+                          <span className="inline-block font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md print:bg-transparent print:border-0 print:p-0 print:text-slate-900">
+                            {guest.seat}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center font-mono tabular-nums text-slate-700">
                         {guest.pax} orang

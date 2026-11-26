@@ -11,7 +11,8 @@ import {
   Plus, 
   Sparkles,
   Search,
-  X
+  X,
+  Armchair
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { formatTime } from '../../lib/dateUtils';
@@ -44,7 +45,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenAddGuest }) 
     if (!searchClean) return true;
     return (
       g.name.toLowerCase().includes(searchClean) ||
-      (g.organization && g.organization.toLowerCase().includes(searchClean))
+      (g.organization && g.organization.toLowerCase().includes(searchClean)) ||
+      (g.seat && g.seat.toLowerCase().includes(searchClean))
     );
   }).sort((a, b) => {
     if (a.status === 'checked_in' && b.status === 'checked_in') {
@@ -300,12 +302,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenAddGuest }) 
                       <p className="text-sm font-bold text-slate-900 break-words whitespace-normal leading-snug">
                         {guest.name}
                       </p>
-                      {guest.organization && (
-                        <p className="text-xs text-slate-500 break-words mt-0.5 flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{guest.organization}</span>
-                        </p>
-                      )}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                        {guest.organization && (
+                          <p className="text-xs text-slate-500 break-words flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{guest.organization}</span>
+                          </p>
+                        )}
+                        {guest.seat && guest.seat.trim() && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md">
+                            <Armchair className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>{guest.seat}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 

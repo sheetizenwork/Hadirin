@@ -19,7 +19,8 @@ import {
   GraduationCap,
   Sparkles,
   FileSpreadsheet,
-  HelpCircle
+  HelpCircle,
+  Armchair
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
@@ -27,6 +28,7 @@ import { formatTime } from '../../lib/dateUtils';
 import { generateQRCodeDataURL } from '../../lib/qrUtils';
 import { CheckInSuccessModal } from '../CheckInSuccessModal';
 import { DownloadGuestsModal } from '../DownloadGuestsModal';
+import { BulkSeatEditModal } from '../BulkSeatEditModal';
 import { parseBulkGuestInput, ParseMode, ParsedGuestItem } from '../../lib/bulkGuestParser';
 
 interface EventAndGuestsPageProps {
@@ -66,6 +68,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
 
   // Modal states
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isBulkSeatModalOpen, setIsBulkSeatModalOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [selectedQR, setSelectedQR] = useState<Guest | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState<string>('');
@@ -110,6 +113,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
   const [editForm, setEditForm] = useState({
     name: '',
     organization: '',
+    seat: '',
     paxInput: '1',
   });
 
@@ -137,6 +141,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     updateGuest(editingGuest.id, {
       name: editForm.name.trim(),
       organization: editForm.organization.trim(),
+      seat: editForm.seat.trim(),
       pax: finalPax,
     });
 
@@ -148,6 +153,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     setEditForm({
       name: g.name,
       organization: g.organization,
+      seat: g.seat || '',
       paxInput: String(g.pax || 1),
     });
   };
@@ -196,11 +202,13 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
   };
 
   const buildWhatsAppUrl = (guest: Guest) => {
+    const seatLine = guest.seat && guest.seat.trim() ? `💺 Tempat Duduk: *${guest.seat.trim()}*\n` : '';
     const text = `Halo Bapak/Ibu *${guest.name}*,\n\n` +
       `Anda diundang untuk menghadiri:\n` +
       `*${event.title}*\n` +
       `📅 Tanggal: ${event.date}\n` +
       `📍 Lokasi: ${event.location}\n` +
+      `${seatLine}` +
       `👥 Kapasitas Undangan: ${guest.pax} Orang\n\n` +
       `Harap sebutkan nama Anda kepada petugas resepsionis di lokasi acara untuk presensi kilat.\n\n` +
       `Terima kasih!`;
@@ -211,7 +219,8 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     const query = searchQuery.toLowerCase();
     const matchQuery =
       g.name.toLowerCase().includes(query) ||
-      g.organization.toLowerCase().includes(query);
+      g.organization.toLowerCase().includes(query) ||
+      (g.seat && g.seat.toLowerCase().includes(query));
 
     const matchStatus =
       statusFilter === 'all' ||
@@ -388,6 +397,14 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
               <span>Download Undangan & QR</span>
             </button>
             <button
+              onClick={() => setIsBulkSeatModalOpen(true)}
+              className="px-3.5 py-2.5 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-200 transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Isi atau update kolom tempat duduk untuk banyak tamu sekaligus"
+            >
+              <Armchair className="w-4 h-4 text-amber-600" />
+              <span>Bulk Tempat Duduk</span>
+            </button>
+            <button
               onClick={() => setIsBulkModalOpen(true)}
               className="px-3.5 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 shadow-sm"
             >
@@ -412,7 +429,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama tamu atau instansi..."
+              placeholder="Cari nama tamu, instansi, atau tempat duduk..."
               className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
@@ -473,12 +490,20 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                         <h4 className="font-bold text-slate-900 text-sm sm:text-base break-words whitespace-normal leading-snug">
                           {guest.name}
                         </h4>
-                        {guest.organization && (
-                          <p className="text-xs text-slate-500 break-words mt-0.5 flex items-center gap-1">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span>{guest.organization}</span>
-                          </p>
-                        )}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                          {guest.organization && (
+                            <p className="text-xs text-slate-500 break-words flex items-center gap-1">
+                              <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{guest.organization}</span>
+                            </p>
+                          )}
+                          {guest.seat && guest.seat.trim() && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md">
+                              <Armchair className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>{guest.seat}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
@@ -613,24 +638,39 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Berapa Orang yang Diundang / Pax <span className="text-slate-400 font-normal">(Opsional, default 1)</span>
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={editForm.paxInput}
-                  onChange={(e) => setEditForm({ ...editForm, paxInput: e.target.value })}
-                  onBlur={() => {
-                    const p = parseInt(editForm.paxInput, 10);
-                    if (isNaN(p) || p < 1) {
-                      setEditForm({ ...editForm, paxInput: '1' });
-                    }
-                  }}
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Tempat Duduk <span className="text-slate-400 font-normal">(Opsional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.seat}
+                    onChange={(e) => setEditForm({ ...editForm, seat: e.target.value })}
+                    placeholder="Contoh: VIP A-01 / Meja 5"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Jumlah / Pax <span className="text-slate-400 font-normal">(Default 1)</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={editForm.paxInput}
+                    onChange={(e) => setEditForm({ ...editForm, paxInput: e.target.value })}
+                    onBlur={() => {
+                      const p = parseInt(editForm.paxInput, 10);
+                      if (isNaN(p) || p < 1) {
+                        setEditForm({ ...editForm, paxInput: '1' });
+                      }
+                    }}
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold"
+                  />
+                </div>
               </div>
 
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
@@ -779,16 +819,16 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                       <span><strong>Mode Nama Saja:</strong> 100% setiap baris disimpan sebagai nama utuh tamu (aman untuk nama panjang & gelar).</span>
                     )}
                     {bulkParseMode === 'tab' && (
-                      <span><strong>Mode Excel:</strong> Kolom dipisah Tab. Kolom 1: Nama, Kolom 2: Instansi, Kolom 3: Pax.</span>
+                      <span><strong>Mode Excel:</strong> Kolom dipisah Tab. Kolom 1: Nama, Kolom 2: Instansi, Kolom 3: Pax, Kolom 4: Tempat Duduk.</span>
                     )}
                     {bulkParseMode === 'semicolon' && (
-                      <span><strong>Format Titik Koma:</strong> <code>Nama ; Instansi ; Pax</code></span>
+                      <span><strong>Format Titik Koma:</strong> <code>Nama ; Instansi ; Pax ; Tempat Duduk</code></span>
                     )}
                     {bulkParseMode === 'dash' && (
-                      <span><strong>Format Strip:</strong> <code>Nama - Instansi - Pax</code></span>
+                      <span><strong>Format Strip:</strong> <code>Nama - Instansi - Pax - Tempat Duduk</code></span>
                     )}
                     {bulkParseMode === 'pipe' && (
-                      <span><strong>Format Garis:</strong> <code>Nama | Instansi | Pax</code></span>
+                      <span><strong>Format Garis:</strong> <code>Nama | Instansi | Pax | Tempat Duduk</code></span>
                     )}
                   </p>
                 </div>
@@ -882,8 +922,9 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                         <tr>
                           <th className="py-1.5 px-3 w-8">#</th>
                           <th className="py-1.5 px-3">Nama Lengkap Tamu</th>
-                          <th className="py-1.5 px-3">Instansi / Perusahaan</th>
-                          <th className="py-1.5 px-3 w-16 text-center">Pax</th>
+                          <th className="py-1.5 px-3">Instansi</th>
+                          <th className="py-1.5 px-3">Tempat Duduk</th>
+                          <th className="py-1.5 px-3 w-14 text-center">Pax</th>
                           <th className="py-1.5 px-3 w-28 text-center">Status Data</th>
                         </tr>
                       </thead>
@@ -906,6 +947,9 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
                             </td>
                             <td className="py-1.5 px-3 text-slate-600">
                               {item.organization ? item.organization : <span className="text-slate-300 italic">—</span>}
+                            </td>
+                            <td className="py-1.5 px-3 text-amber-800 font-semibold">
+                              {item.seat ? item.seat : <span className="text-slate-300 italic font-normal">—</span>}
                             </td>
                             <td className="py-1.5 px-3 text-center font-semibold text-indigo-600">
                               {item.pax}
@@ -1009,9 +1053,17 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
               )}
             </div>
 
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs mb-4">
-              <span className="text-[10px] text-slate-400 block">Kapasitas Undangan</span>
-              <span className="font-bold text-slate-800">{selectedQR.pax} Orang</span>
+            <div className={`grid gap-2 mb-4 ${selectedQR.seat && selectedQR.seat.trim() ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
+                <span className="text-[10px] text-slate-400 block">Kapasitas Undangan</span>
+                <span className="font-bold text-slate-800">{selectedQR.pax} Orang</span>
+              </div>
+              {selectedQR.seat && selectedQR.seat.trim() && (
+                <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200/70 text-xs">
+                  <span className="text-[10px] text-amber-600 font-semibold block">Tempat Duduk</span>
+                  <span className="font-bold text-amber-900">{selectedQR.seat}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1090,6 +1142,12 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
         onClose={() => setIsDownloadModalOpen(false)}
         guests={guests}
         event={event}
+      />
+
+      {/* MODAL: BULK EDIT TEMPAT DUDUK */}
+      <BulkSeatEditModal
+        isOpen={isBulkSeatModalOpen}
+        onClose={() => setIsBulkSeatModalOpen(false)}
       />
     </div>
   );

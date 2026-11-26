@@ -33,6 +33,7 @@ interface AttendanceContextType {
   addGuest: (guestData: {
     name: string;
     organization?: string;
+    seat?: string;
     pax?: number;
   }) => Promise<Guest | null>;
   updateGuest: (id: string, updates: Partial<Guest>) => Promise<void>;
@@ -41,8 +42,13 @@ interface AttendanceContextType {
   bulkAddGuests: (newGuests: Array<{
     name: string;
     organization?: string;
+    seat?: string;
     pax?: number;
   }>) => Promise<number>;
+  bulkUpdateSeats: (updates: Array<{
+    id: string;
+    seat: string;
+  }>) => Promise<{ updated: number; error?: string }>;
   checkInGuest: (queryOrId: string, actualPax?: number) => CheckInResult;
   cancelCheckIn: (id: string) => Promise<void>;
   resetToDemoData: () => void;
@@ -66,26 +72,28 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Monitor Display Settings with localStorage persistence
   const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>(() => {
-    const saved = localStorage.getItem('hadirin_monitor_settings');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse monitor settings', e);
-      }
-    }
-    return {
+    const defaults: MonitorSettings = {
       showEventName: true,
       showOrganizer: true,
       showDate: true,
       showWelcomeCard: true,
       showGuestOrganization: true,
+      showGuestSeat: true,
       showGuestPax: true,
       showLiveTicker: true,
       liveTickerCount: 5,
       showMiniCounter: true,
       showFooter: true,
     };
+    const saved = localStorage.getItem('hadirin_monitor_settings');
+    if (saved) {
+      try {
+        return { ...defaults, ...JSON.parse(saved) };
+      } catch (e) {
+        console.error('Failed to parse monitor settings', e);
+      }
+    }
+    return defaults;
   });
 
   const updateMonitorSettings = (newSettings: Partial<MonitorSettings>) => {
@@ -106,6 +114,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     qr_code: String(row.id),
     name: String(row.name || ''),
     organization: String(row.organization || ''),
+    seat: String(row.seat || ''),
     pax: Number(row.pax) || 1,
     status: (row.status as 'checked_in' | 'pending') || 'pending',
     checked_in_at: row.checked_in_at ? String(row.checked_in_at) : null,
@@ -446,6 +455,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
   const addGuest = async (guestData: {
     name: string;
     organization?: string;
+    seat?: string;
     pax?: number;
   }): Promise<Guest | null> => {
     const trimmedName = guestData.name.trim();
@@ -459,6 +469,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     }
 
     const finalPax = guestData.pax && guestData.pax > 0 ? Number(guestData.pax) : 1;
+    const finalSeat = guestData.seat?.trim() || '';
     const tempId = `g-${Date.now()}`;
 
     // Optimistic UI update
@@ -467,6 +478,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
       qr_code: tempId,
       name: trimmedName,
       organization: guestData.organization?.trim() || '',
+      seat: finalSeat,
       pax: finalPax,
       status: 'pending',
       checked_in_at: null,
@@ -480,6 +492,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
       const insertPayload: Record<string, unknown> = {
         name: guestData.name.trim(),
         organization: guestData.organization?.trim() || '',
+        seat: finalSeat,
         pax: finalPax,
         status: 'pending',
         actual_pax: 0,
@@ -523,6 +536,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
       const dbUpdates: Record<string, unknown> = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name.trim();
       if (updates.organization !== undefined) dbUpdates.organization = updates.organization?.trim() || '';
+      if (updates.seat !== undefined) dbUpdates.seat = updates.seat?.trim() || '';
       if (updates.pax !== undefined) dbUpdates.pax = updates.pax;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.checked_in_at !== undefined) dbUpdates.checked_in_at = updates.checked_in_at;
@@ -561,6 +575,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     newGuests: Array<{
       name: string;
       organization?: string;
+      seat?: string;
       pax?: number;
     }>
   ): Promise<number> => {
@@ -571,7 +586,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     const existingSet = new Set(guests.map((g) => g.name.trim().toLowerCase()));
     const seenBatch = new Set<string>();
 
-    const validItems: Array<{ name: string; organization: string; pax: number }> = [];
+    const validItems: Array<{ name: string; organization: string; seat: string; pax: number }> = [];
     for (const item of newGuests) {
       const trimmed = item.name ? item.name.trim() : '';
       if (!trimmed) continue;
@@ -581,6 +596,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         validItems.push({
           name: trimmed,
           organization: item.organization?.trim() || '',
+          seat: item.seat?.trim() || '',
           pax: item.pax && item.pax > 0 ? Number(item.pax) : 1,
         });
       }
@@ -595,6 +611,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         qr_code: id,
         name: item.name,
         organization: item.organization,
+        seat: item.seat,
         pax: item.pax,
         status: 'pending',
         checked_in_at: null,
@@ -610,6 +627,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         const row: Record<string, unknown> = {
           name: item.name.trim(),
           organization: item.organization?.trim() || '',
+          seat: item.seat?.trim() || '',
           pax: item.pax && item.pax > 0 ? Number(item.pax) : 1,
           status: 'pending',
           actual_pax: 0,
@@ -638,6 +656,59 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     }
 
     return validItems.length;
+  };
+
+  // Bulk update seat assignments for existing guests in fast parallel batches
+  const bulkUpdateSeats = async (
+    updates: Array<{ id: string; seat: string }>
+  ): Promise<{ updated: number; error?: string }> => {
+    if (!updates.length) return { updated: 0 };
+
+    const updateMap = new Map<string, string>();
+    for (const u of updates) {
+      updateMap.set(u.id, u.seat.trim());
+    }
+
+    // Optimistic local state update immediately
+    setGuests((prev) =>
+      prev.map((g) => (updateMap.has(g.id) ? { ...g, seat: updateMap.get(g.id) || '' } : g))
+    );
+
+    let updatedCount = 0;
+    let firstError: string | undefined;
+
+    // Execute in batches of 20 for fast, reliable Supabase updates
+    const batchSize = 20;
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const chunk = updates.slice(i, i + batchSize);
+      const results = await Promise.all(
+        chunk.map((item) =>
+          supabase
+            .from('guests')
+            .update({ seat: item.seat.trim() })
+            .eq('id', item.id)
+        )
+      );
+
+      for (const res of results) {
+        if (res.error) {
+          if (!firstError) firstError = res.error.message;
+        } else {
+          updatedCount++;
+        }
+      }
+
+      // Stop early if column 'seat' does not exist in Supabase table
+      if (firstError && firstError.toLowerCase().includes('seat')) {
+        break;
+      }
+    }
+
+    if (firstError) {
+      return { updated: updatedCount, error: firstError };
+    }
+
+    return { updated: updatedCount };
   };
 
   // Real-time check-in logic
@@ -819,6 +890,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         updateActualPax,
         deleteGuest,
         bulkAddGuests,
+        bulkUpdateSeats,
         checkInGuest,
         cancelCheckIn,
         resetToDemoData,

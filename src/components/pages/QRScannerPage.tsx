@@ -13,7 +13,8 @@ import {
   Building2, 
   Clock, 
   Users,
-  Sparkles
+  Sparkles,
+  Armchair
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
@@ -228,7 +229,11 @@ export const QRScannerPage: React.FC = () => {
   // Autocomplete / Suggested Names Matching
   const cleanInput = nameInput.trim().toLowerCase();
   const suggestedGuests = cleanInput.length > 0
-    ? guests.filter((g) => g.name.toLowerCase().includes(cleanInput))
+    ? guests.filter(
+        (g) =>
+          g.name.toLowerCase().includes(cleanInput) ||
+          (g.seat && g.seat.toLowerCase().includes(cleanInput))
+      )
     : [];
 
   // Attended guests for the activity feed below
@@ -245,7 +250,8 @@ export const QRScannerPage: React.FC = () => {
     if (!cleanFeedSearch) return true;
     return (
       g.name.toLowerCase().includes(cleanFeedSearch) ||
-      (g.organization && g.organization.toLowerCase().includes(cleanFeedSearch))
+      (g.organization && g.organization.toLowerCase().includes(cleanFeedSearch)) ||
+      (g.seat && g.seat.toLowerCase().includes(cleanFeedSearch))
     );
   });
 
@@ -330,9 +336,17 @@ export const QRScannerPage: React.FC = () => {
                       <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 break-words whitespace-normal leading-snug">
                         {g.name}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5 break-words">
-                        {g.organization || 'Tamu Undangan'} · {g.pax} Pax
-                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                        <p className="text-xs text-slate-500 break-words">
+                          {g.organization || 'Tamu Undangan'} · {g.pax} Pax
+                        </p>
+                        {g.seat && g.seat.trim() && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                            <Armchair className="w-3 h-3 text-amber-600" />
+                            <span>{g.seat}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="shrink-0">
@@ -496,12 +510,20 @@ export const QRScannerPage: React.FC = () => {
                     <p className="text-xs sm:text-sm font-bold text-slate-900 break-words whitespace-normal leading-snug">
                       Ibu/Bapak {guest.name}
                     </p>
-                    {guest.organization && (
-                      <p className="text-[11px] text-slate-500 break-words mt-0.5 flex items-center gap-1">
-                        <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span>{guest.organization}</span>
-                      </p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-0.5">
+                      {guest.organization && (
+                        <p className="text-[11px] text-slate-500 break-words flex items-center gap-1">
+                          <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{guest.organization}</span>
+                        </p>
+                      )}
+                      {guest.seat && guest.seat.trim() && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                          <Armchair className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>{guest.seat}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

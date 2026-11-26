@@ -21,8 +21,9 @@ export const MonitorSettingsPage: React.FC = () => {
   const [saveToast, setSaveToast] = useState(false);
 
   const toggleSetting = (key: keyof MonitorSettings) => {
-    if (typeof monitorSettings[key] === 'boolean') {
-      updateMonitorSettings({ [key]: !monitorSettings[key] });
+    const currentVal = monitorSettings[key];
+    if (typeof currentVal === 'boolean' || currentVal === undefined) {
+      updateMonitorSettings({ [key]: currentVal === false ? true : false });
       setSaveToast(true);
       setTimeout(() => setSaveToast(false), 2000);
     }
@@ -36,6 +37,7 @@ export const MonitorSettingsPage: React.FC = () => {
       showWelcomeCard: true,
       showGuestOrganization: true,
       showGuestPax: true,
+      showGuestSeat: true,
       showLiveTicker: true,
       liveTickerCount: 5,
       showMiniCounter: true,
@@ -239,6 +241,24 @@ export const MonitorSettingsPage: React.FC = () => {
               }`}
             >
               {monitorSettings.showGuestPax ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* Toggle: Tampilkan Tempat Duduk / Meja */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+            <div>
+              <p className="text-xs font-bold text-slate-800">Tampilkan Tempat Duduk / Meja</p>
+              <p className="text-[11px] text-slate-500">Sertakan info nomor kursi / meja pada kartu sambutan &amp; live feed</p>
+            </div>
+            <button
+              onClick={() => toggleSetting('showGuestSeat')}
+              className={`p-2 rounded-lg transition-colors ${
+                monitorSettings.showGuestSeat !== false
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-slate-200 text-slate-500'
+              }`}
+            >
+              {monitorSettings.showGuestSeat !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </button>
           </div>
         </div>

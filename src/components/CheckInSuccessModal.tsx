@@ -7,7 +7,8 @@ import {
   Minus, 
   Plus, 
   Clock,
-  History
+  History,
+  Armchair
 } from 'lucide-react';
 import { Guest } from '../types';
 
@@ -120,6 +121,21 @@ export const CheckInSuccessModal: React.FC<CheckInSuccessModalProps> = ({
             <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
             <span>{guest.organization}</span>
           </p>
+        )}
+
+        {/* Prominent Seat / Tempat Duduk Highlight */}
+        {guest.seat && guest.seat.trim() && (
+          <div className="mt-3.5 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-amber-50 border-2 border-amber-300/80 text-amber-900 shadow-sm">
+            <Armchair className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="text-left leading-tight">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                Tempat Duduk
+              </span>
+              <span className="text-sm sm:text-base font-black text-amber-950">
+                {guest.seat}
+              </span>
+            </div>
+          </div>
         )}
 
         {/* Editable Arrived Pax Section */}
