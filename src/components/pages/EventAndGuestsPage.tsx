@@ -20,7 +20,8 @@ import {
   Sparkles,
   FileSpreadsheet,
   HelpCircle,
-  Armchair
+  Armchair,
+  ArrowUpDown
 } from 'lucide-react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { Guest } from '../../types';
@@ -50,9 +51,10 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     cancelCheckIn
   } = useAttendance();
 
-  // Search & Filter state
+  // Search, Filter & Sort state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'checked_in' | 'pending'>('all');
+  const [sortBy, setSortBy] = useState<'default' | 'name_asc' | 'name_desc' | 'pax_desc' | 'pax_asc'>('default');
 
   // Event editing state
   const [isEditingEvent, setIsEditingEvent] = useState(false);
@@ -215,20 +217,42 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   };
 
-  const filteredGuests = guests.filter((g) => {
+  const filteredGuests = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    const matchQuery =
-      g.name.toLowerCase().includes(query) ||
-      g.organization.toLowerCase().includes(query) ||
-      (g.seat && g.seat.toLowerCase().includes(query));
+    const filtered = guests.filter((g) => {
+      const matchQuery =
+        g.name.toLowerCase().includes(query) ||
+        g.organization.toLowerCase().includes(query) ||
+        (g.seat && g.seat.toLowerCase().includes(query));
 
-    const matchStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'checked_in' && g.status === 'checked_in') ||
-      (statusFilter === 'pending' && g.status === 'pending');
+      const matchStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'checked_in' && g.status === 'checked_in') ||
+        (statusFilter === 'pending' && g.status === 'pending');
 
-    return matchQuery && matchStatus;
-  });
+      return matchQuery && matchStatus;
+    });
+
+    if (sortBy === 'default') return filtered;
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name_asc') {
+        return a.name.localeCompare(b.name, 'id', { sensitivity: 'base' });
+      }
+      if (sortBy === 'name_desc') {
+        return b.name.localeCompare(a.name, 'id', { sensitivity: 'base' });
+      }
+      if (sortBy === 'pax_desc') {
+        const diff = (b.pax || 1) - (a.pax || 1);
+        return diff !== 0 ? diff : a.name.localeCompare(b.name, 'id', { sensitivity: 'base' });
+      }
+      if (sortBy === 'pax_asc') {
+        const diff = (a.pax || 1) - (b.pax || 1);
+        return diff !== 0 ? diff : a.name.localeCompare(b.name, 'id', { sensitivity: 'base' });
+      }
+      return 0;
+    });
+  }, [guests, searchQuery, statusFilter, sortBy]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-24 lg:pb-12">
@@ -421,10 +445,10 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
           </div>
         </div>
 
-        {/* Search & Status Filter */}
+        {/* Search, Status Filter & Sort */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="sm:col-span-8 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <div className="sm:col-span-6 relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
             <input
               type="text"
               value={searchQuery}
@@ -434,7 +458,7 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
             />
           </div>
 
-          <div className="sm:col-span-4">
+          <div className="sm:col-span-3">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'all' | 'checked_in' | 'pending')}
@@ -443,6 +467,24 @@ export const EventAndGuestsPage: React.FC<EventAndGuestsPageProps> = ({
               <option value="all">Semua Status</option>
               <option value="checked_in">Sudah Hadir</option>
               <option value="pending">Belum Hadir</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-3 relative">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <select
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value as 'default' | 'name_asc' | 'name_desc' | 'pax_desc' | 'pax_asc')
+              }
+              aria-label="Urutkan daftar tamu"
+              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-700 font-medium"
+            >
+              <option value="default">Urutan Bawaan</option>
+              <option value="name_asc">Nama: A - Z</option>
+              <option value="name_desc">Nama: Z - A</option>
+              <option value="pax_desc">Jumlah Tamu: Terbanyak</option>
+              <option value="pax_asc">Jumlah Tamu: Tersedikit</option>
             </select>
           </div>
         </div>
